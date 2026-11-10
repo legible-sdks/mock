@@ -8,7 +8,7 @@ import { type Operation, Router } from './router.ts';
 import type { Spec } from './spec.ts';
 import { type Issue, Validator } from './validator.ts';
 
-export const VERSION = '0.1.1';
+export const VERSION = '0.1.2';
 
 export type LogLevel = 'silent' | 'summary' | 'details';
 

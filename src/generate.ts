@@ -292,9 +292,20 @@ function discriminatorValue(doc: Obj, discriminator: Obj, variant: unknown): str
   return ref.split('/').pop();
 }
 
+const EXAMPLE_ONLY_KEYS = new Set(['example', 'examples', 'default', 'description', 'title']);
+
+function exampleOnly(node: unknown): node is Obj {
+  return isObj(node) && Object.keys(node).length > 0 && Object.keys(node).every((key) => EXAMPLE_ONLY_KEYS.has(key));
+}
+
 function genAllOf(state: State, node: Obj, depth: number): unknown {
   let merged: unknown = undefined;
   for (const part of node.allOf as unknown[]) {
+    if (exampleOnly(part)) {
+      const sample = part.example !== undefined ? part.example : Array.isArray(part.examples) ? part.examples[0] : part.default;
+      if (sample !== undefined && conforms(state.doc, node, sample)) return structuredClone(sample);
+      continue;
+    }
     const value = gen(state, part, depth);
     if (isObj(value) && (merged === undefined || isObj(merged))) merged = { ...(merged as Obj | undefined), ...value };
     else if (merged === undefined) merged = value;

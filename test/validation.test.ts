@@ -215,3 +215,23 @@ test('a nullable $ref admits null, and schemas that cannot compile are reported'
   assert.equal(failures.length, 2, JSON.stringify(failures));
   assert.match(failures[0]!.message, /minimum must be number/);
 });
+
+test('an array of objects in the query accepts bracket groups, and example-only allOf branches that break the schema are ignored', () => {
+  const doc = {
+    openapi: '3.0.3',
+    info: { title: 'q', version: '1' },
+    paths: {
+      '/x': {
+        get: {
+          parameters: [{ name: 'filters', in: 'query', schema: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, op: { type: 'string', enum: ['=', '<'] } } } } }],
+          responses: { '200': { description: 'ok', content: { 'application/json': { schema: { $ref: '#/components/schemas/Link' } } } } },
+        },
+      },
+    },
+    components: { schemas: { Link: { allOf: [{ type: 'object', properties: { value: { type: 'object' } }, required: ['value'] }, { example: { value: 'not an object' } }] } } },
+  };
+  const m = petsMock({}, doc);
+  assert.deepEqual(errors(m, 'GET', '/x?filters[name]=a&filters[op]=%3D'), []);
+  assert.deepEqual(errors(m, 'GET', '/x?filters[0][name]=a&filters[1][op]=%3C'), []);
+  assert.deepEqual(errors(m, 'GET', '/x?filters[0][op]=%3E'), ['structure.enum query.filters.0.op']);
+});

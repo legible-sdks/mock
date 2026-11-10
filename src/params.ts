@@ -137,6 +137,8 @@ function readQuery(
   const name = param.name;
   const types = schemaTypes(ctx.doc, param.schema);
   const objectOnly = types.has('object') && ![...types].some((t) => t !== 'object' && t !== 'null');
+  const items = types.has('array') ? itemsSchema(ctx.doc, param.schema) : undefined;
+  const arrayOfObjects = items !== undefined && !types.has('object') && schemaTypes(ctx.doc, items).has('object');
   const mctx: MaterializeContext = { doc: ctx.doc, formats, issues, where: 'query', label: 'Query parameter' };
   if (param.json) {
     const index = query.findIndex(([key]) => key === name);
@@ -173,6 +175,10 @@ function readQuery(
     if (!split) return;
     consumed.add(i);
     found = true;
+    if (split.style && arrayOfObjects) {
+      insert(root, split, { key, value, text: true });
+      return;
+    }
     if (split.style) {
       const expected = formats.object === 'brackets' ? 'brackets' : 'dots';
       if (!objectOnly && !types.has('object')) {
@@ -184,6 +190,10 @@ function readQuery(
     insert(root, split, { key, value, text: true });
   });
   if (!found) return undefined;
+  if (arrayOfObjects && root.children.size > 0) {
+    if ([...root.children.keys()].every((k) => /^\d+$/.test(k))) return materialize({ ...mctx, formats: { ...formats, array: 'indices' } }, root, param.schema, name);
+    return [materialize(mctx, root, items, name)];
+  }
   return materialize(mctx, root, param.schema, name);
 }
 
