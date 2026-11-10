@@ -1,0 +1,50 @@
+{
+  "name": "@legible-sdks/mock",
+  "version": "0.1.0",
+  "description": "OpenAPI 3 mock server that validates requests and answers with schema-shaped responses",
+  "keywords": [
+    "openapi",
+    "mock",
+    "mock-server",
+    "api",
+    "testing",
+    "sdk",
+    "swagger"
+  ],
+  "license": "MIT",
+  "author": "ozerkh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/legible-sdks/mock.git"
+  },
+  "homepage": "https://github.com/legible-sdks/mock#readme",
+  "bugs": {
+    "url": "https://github.com/legible-sdks/mock/issues"
+  },
+  "type": "module",
+  "bin": {
+    "legible-mock": "dist/legible-mock.cjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/cli.ts --bundle --platform=node --target=node18 --format=cjs --banner:js='#!/usr/bin/env node' --outfile=dist/legible-mock.cjs --log-level=warning",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.0",
+    "@types/node": "^26.1.1",
+    "esbuild": "0.25.10",
+    "typescript": "^5.9.0"
+  }
+}
