@@ -66,8 +66,8 @@ export function conforms(doc: Obj, schema: unknown, value: unknown, depth = 0, s
   const types = declaredTypes.length > 0 ? declaredTypes : isObj(schema.properties) ? ['object'] : schema.items !== undefined ? ['array'] : [];
   const actual = jsonType(value);
   if (types.length > 0 && !types.includes(actual) && !(actual === 'integer' && types.includes('number'))) return false;
-  if (actual === 'string' && schema.format === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value as string)) return false;
-  if (actual === 'string' && schema.format === 'date-time' && (!/^\d{4}-\d{2}-\d{2}T/.test(value as string) || Number.isNaN(Date.parse(value as string)))) return false;
+  if (actual === 'string' && !fitsString(schema, value as string)) return false;
+  if ((actual === 'integer' || actual === 'number') && !fitsNumber(schema, value as number)) return false;
   if (actual === 'object' && isObj(value)) {
     const props = isObj(schema.properties) ? schema.properties : {};
     if (Array.isArray(schema.required) && schema.required.some((r: unknown) => typeof r === 'string' && isObj(props[r]) && !(r in value))) return false;
@@ -83,9 +83,27 @@ export function conforms(doc: Obj, schema: unknown, value: unknown, depth = 0, s
 }
 
 function typesOf(node: Obj): string[] {
-  if (typeof node.type === 'string') return [node.type];
-  if (Array.isArray(node.type)) return node.type.filter((t: unknown): t is string => typeof t === 'string');
+  if (typeof node.type === 'string') return [node.type.toLowerCase()];
+  if (Array.isArray(node.type)) return node.type.filter((t: unknown): t is string => typeof t === 'string').map((t: string) => t.toLowerCase());
   return [];
+}
+
+function fitsString(schema: Obj, value: string): boolean {
+  if (typeof schema.minLength === 'number' && value.length < schema.minLength) return false;
+  if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) return false;
+  if (schema.format === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (schema.format === 'date-time' && (!/^\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/.test(value) || Number.isNaN(Date.parse(value)))) return false;
+  if (schema.format === 'uuid' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return false;
+  if (schema.format === 'email' && !/^[^\s@]+@[^\s@]+$/.test(value)) return false;
+  return true;
+}
+
+function fitsNumber(schema: Obj, value: number): boolean {
+  if (typeof schema.minimum === 'number' && value < schema.minimum) return false;
+  if (typeof schema.maximum === 'number' && value > schema.maximum) return false;
+  if (typeof schema.exclusiveMinimum === 'number' && value <= schema.exclusiveMinimum) return false;
+  if (typeof schema.exclusiveMaximum === 'number' && value >= schema.exclusiveMaximum) return false;
+  return true;
 }
 
 function gen(state: State, schema: unknown, depth: number): unknown {
@@ -198,7 +216,9 @@ function genNode(state: State, node: unknown, depth: number): unknown {
     const declared = typesOf(node);
     const typed = (v: unknown): boolean => declared.length === 0 || declared.includes(jsonType(v)) || (jsonType(v) === 'integer' && declared.includes('number'));
     const value = node.enum.find((v: unknown) => v !== null && typed(v)) ?? node.enum.find((v: unknown) => v !== null);
-    return structuredClone(value === undefined ? node.enum[0] : value);
+    const picked = value === undefined ? node.enum[0] : value;
+    if (declared.includes('string') && (typeof picked === 'number' || typeof picked === 'boolean')) return String(picked);
+    return structuredClone(picked);
   }
   if (Array.isArray(node.allOf) && node.allOf.length > 0) return genAllOf(state, node, depth);
   for (const key of ['oneOf', 'anyOf']) {
@@ -326,7 +346,9 @@ function genArray(state: State, node: Obj, depth: number): unknown[] {
 }
 
 function genString(node: Obj): string {
-  let value = typeof node.format === 'string' && STRING_FORMATS[node.format] ? (STRING_FORMATS[node.format] as string) : 'string';
+  const formatted = typeof node.format === 'string' ? STRING_FORMATS[node.format] : undefined;
+  if (formatted !== undefined) return formatted;
+  let value = 'string';
   if (typeof node.minLength === 'number' && value.length < node.minLength) value = value.padEnd(node.minLength, 'x');
   if (typeof node.maxLength === 'number' && value.length > node.maxLength) value = value.slice(0, node.maxLength);
   return value;

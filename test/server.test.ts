@@ -250,3 +250,25 @@ test('stream counts are capped and invalid format headers are ignored', async ()
 test('xml responses are serialized as elements', () => {
   assert.equal(encodeBody('application/xml', { pet: { id: 1, tags: ['a', 'b<'] } }).toString(), '<?xml version="1.0" encoding="UTF-8"?>\n<root><pet><id>1</id><tags>a</tags><tags>b&lt;</tags></pet></root>');
 });
+
+test('generated values respect formats, constraints and declared types', () => {
+  assert.equal(generate(PETS, { type: 'string', format: 'date', minLength: 20 }), '2020-01-31');
+  assert.equal(generate(PETS, { type: 'string', minLength: 8 }), 'stringxx');
+  assert.equal(generate(PETS, { type: 'string', maxLength: 30, example: 'an example that is far longer than thirty characters' }), 'string');
+  assert.equal(generate(PETS, { type: 'string', pattern: '^(a+)+$', example: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab' }), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab');
+  assert.equal(generate(PETS, { type: 'integer', minimum: 5, example: 1 }), 5);
+  assert.equal(generate(PETS, { type: 'string', enum: [10, 20, 30] }), '10');
+  assert.equal(generate(PETS, { type: 'String' }), 'string');
+  assert.equal(generate(PETS, { type: 'string', format: 'date-time', example: '2018-01-01T00:01:01' }), '2020-01-31T23:59:59Z');
+});
+
+test('string enums spelled with numbers accept the spelled form', () => {
+  const doc = {
+    openapi: '3.0.3',
+    info: { title: 'e', version: '1' },
+    paths: { '/x': { get: { parameters: [{ name: 'sev', in: 'query', schema: { type: 'string', enum: [10, 20] } }], responses: { '204': { description: 'ok' } } } } },
+  };
+  const m = createMock(specFromDocument(doc as any), { logLevel: 'silent' });
+  assert.deepEqual(m.validate('GET', '/x?sev=10', {}, Buffer.alloc(0)).issues.filter((i) => i.severity === 'error'), []);
+  assert.equal(m.validate('GET', '/x?sev=15', {}, Buffer.alloc(0)).issues.filter((i) => i.severity === 'error').length, 1);
+});

@@ -148,6 +148,10 @@ export class SchemaConverter {
         .filter((t: unknown): t is string => typeof t === 'string' && JSON_TYPES.has(t));
       if (types.length === 0) delete out.type;
       else out.type = Array.isArray(out.type) ? types : types[0];
+      if (types.includes('string') && Array.isArray(out.enum)) {
+        const spelled = out.enum.filter((v: unknown) => typeof v === 'number' || typeof v === 'boolean').map(String);
+        if (spelled.length > 0) out.enum = [...new Set([...out.enum, ...spelled])];
+      }
     }
     for (const key of SCHEMA_KEYWORDS) {
       if (node[key] !== undefined) out[key] = this.convert(node[key], child(ptr, key));

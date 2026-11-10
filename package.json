@@ -1,6 +1,6 @@
 {
   "name": "@legible-sdks/mock",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenAPI 3 mock server that validates requests and answers with schema-shaped responses",
   "keywords": [
     "openapi",
